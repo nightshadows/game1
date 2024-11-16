@@ -137,6 +137,12 @@ class Game {
     }
 
     private handleTileClick(tile: { position: Position, unit?: any, type: string }) {
+        if (this.selectedUnit && !tile.unit && tile.type !== 'WATER') {
+            console.log('Placing new unit:', this.selectedUnit);
+            this.placeUnit(tile.position.row, tile.position.column, this.selectedUnit);
+            return;
+        }
+
         if (tile.unit) {
             console.log('Selected unit:', tile.unit);
             this.selectedUnitId = tile.unit.id;
@@ -233,7 +239,7 @@ class Game {
                 { row: row-1, column: col },     // top left
                 { row: row-1, column: col+1 },   // top right
                 { row: row, column: col+1 },     // right
-                { row: row, column: col },       // left
+                { row: row, column: col-1 },     // left
                 { row: row+1, column: col },     // bottom left
                 { row: row+1, column: col+1 }    // bottom right
             ];
