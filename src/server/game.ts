@@ -1,64 +1,9 @@
-interface GameState {
-    players: Player[];
-    map: Tile[][];
-    currentTurn: number;
-}
-
-interface Player {
-    id: string;
-    name: string;
-    resources: Resources;
-    cities: City[];
-    units: Unit[];
-}
-
-interface Tile {
-    type: TerrainType;
-    position: Position;
-    resources?: ResourceType;
-    occupiedBy?: string;
-    unit?: Unit;
-    movementCost?: number;
-}
-
-type TerrainType = 'PLAINS' | 'MOUNTAINS' | 'WATER' | 'FOREST';
-type ResourceType = 'FOOD' | 'PRODUCTION' | 'GOLD';
-
-interface Position {
-    row: number;
-    column: number;
-}
-
-interface Resources {
-    food: number;
-    production: number;
-    gold: number;
-}
-
-interface City {
-    id: string;
-    name: string;
-    position: Position;
-    owner: string;
-}
-
-interface Unit {
-    id: string;
-    type: string;
-    position: Position;
-    owner: string;
-    movementPoints: number;
-    maxMovementPoints: number;
-}
-
-interface PathNode {
-    position: Position;
-    cost: number;
-    previous?: Position;
-}
+import { MapGenerator } from './mapGenerator';
+import { GameState, TerrainType, Tile, Position, Unit, PathNode } from './types';
 
 export class GameManager {
     private games: Map<string, GameState>;
+    private mapGenerator: MapGenerator;
     private terrainMovementCosts: Record<TerrainType, number> = {
         'PLAINS': 1,
         'MOUNTAINS': 2,
@@ -68,6 +13,7 @@ export class GameManager {
 
     constructor() {
         this.games = new Map();
+        this.mapGenerator = new MapGenerator();
     }
 
     public createGame(): string {
@@ -94,7 +40,7 @@ export class GameManager {
     private createInitialState(): GameState {
         return {
             players: [],
-            map: this.generateMap(10, 10),
+            map: this.mapGenerator.generateMap(10, 10),
             currentTurn: 0
         };
     }
@@ -132,39 +78,6 @@ export class GameManager {
         };
 
         console.log('Placed starting units:', game.map[centerRow][centerColumn].unit, game.map[centerRow][centerColumn + 1].unit);
-    }
-
-    // When creating a new game, ensure all existing units are removed
-    private generateMap(width: number, height: number): Tile[][] {
-        const map: Tile[][] = [];
-        for (let row = 0; row < height; row++) {
-            map[row] = [];
-            for (let column = 0; column < width; column++) {
-                map[row][column] = {
-                    type: this.getRandomTerrainType(),
-                    position: { row: row, column: column },
-                    unit: undefined  // Explicitly set unit to undefined
-                };
-            }
-        }
-        return map;
-    }
-
-    private getRandomTerrainType(): TerrainType {
-        const types: TerrainType[] = ['PLAINS', 'MOUNTAINS', 'WATER', 'FOREST'];
-        const weights = [0.5, 0.2, 0.15, 0.15]; // 50% plains, 20% mountains, 15% water, 15% forest
-
-        const random = Math.random();
-        let sum = 0;
-
-        for (let i = 0; i < types.length; i++) {
-            sum += weights[i];
-            if (random < sum) {
-                return types[i];
-            }
-        }
-
-        return 'PLAINS';
     }
 
     public placeUnit(gameId: string, position: Position, unitType: string): boolean {
