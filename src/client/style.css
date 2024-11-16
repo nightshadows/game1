@@ -1,0 +1,217 @@
+#game {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    margin: 0;
+    padding: 20px;
+}
+
+#map {
+    flex: 1;
+    border: 1px solid #ccc;
+    margin-bottom: 20px;
+    background-color: #f0f0f0;
+    overflow: auto;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#controls {
+    display: flex;
+    gap: 10px;
+}
+
+button {
+    padding: 10px 20px;
+    cursor: pointer;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+.tile {
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.tile:hover {
+    opacity: 0.8;
+}
+
+.tile-plains {
+    background-color: #90EE90;
+}
+
+.tile-mountains {
+    background-color: #8B4513;
+    position: relative;
+}
+
+.tile-mountains::after {
+    content: '▲';
+    color: #654321;
+}
+
+.tile-water {
+    background-color: #4169E1;
+    position: relative;
+}
+
+.tile-water::after {
+    content: '~';
+    color: #87CEEB;
+}
+
+.tile-forest {
+    background-color: #228B22;
+    position: relative;
+}
+
+.tile-forest::after {
+    content: '🌲';
+    font-size: 20px;
+}
+
+.tile-selected {
+    outline: 2px solid yellow;
+    outline-offset: -2px;
+    z-index: 1;
+}
+
+#unit-panel {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+#unit-panel h3 {
+    margin: 0 0 10px 0;
+}
+
+.unit-button {
+    margin-right: 10px;
+    background-color: #4a4a4a;
+}
+
+.unit-button.selected {
+    background-color: #2a2a2a;
+    outline: 2px solid yellow;
+}
+
+.tile-unit {
+    position: relative;
+    z-index: 2;
+}
+
+.tile-unit::before {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+}
+
+.unit-WARRIOR::before {
+    content: '🗡️';
+    font-size: 20px;
+}
+
+.unit-SETTLER::before {
+    content: '👨‍🌾';
+    font-size: 20px;
+}
+
+.unit-ARCHER::before {
+    content: '🏹';
+    font-size: 20px;
+}
+
+.unit {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2;
+}
+
+.possible-move {
+    position: relative;
+}
+
+.possible-move::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 255, 0, 0.2);
+    border: 2px solid rgba(0, 255, 0, 0.5);
+    pointer-events: none;
+}
+
+.movement-points {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 10px;
+}
+
+.selected-unit {
+    outline: 2px solid yellow;
+    z-index: 2;
+}
+
+.movement-cost {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 10px;
+    z-index: 3;
+}
+
+.possible-move {
+    position: relative;
+}
+
+.possible-move::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 255, 0, 0.2);
+    border: 2px solid rgba(0, 255, 0, 0.5);
+    pointer-events: none;
+}
+
+.possible-move.tile-mountains::after {
+    background: rgba(255, 165, 0, 0.2);
+    border-color: rgba(255, 165, 0, 0.5);
+}
