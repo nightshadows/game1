@@ -36,13 +36,30 @@ button:hover {
     background-color: #45a049;
 }
 
+.hex-grid {
+    padding: 20px;
+}
+
+.hex-row {
+    display: flex;
+    margin-top: -17px;
+}
+
+.hex-row:first-child {
+    margin-top: 0;
+}
+
+.hex-row:nth-child(2n) {
+    margin-left: 30px;
+}
+
 .tile {
-    width: 40px;
-    height: 40px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    width: 60px;
+    height: 69px;
     position: relative;
+    margin: 0;
+    border: none;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 
 .tile:hover {
@@ -55,38 +72,59 @@ button:hover {
 
 .tile-mountains {
     background-color: #8B4513;
-    position: relative;
-}
-
-.tile-mountains::after {
-    content: '▲';
-    color: #654321;
 }
 
 .tile-water {
     background-color: #4169E1;
-    position: relative;
-}
-
-.tile-water::after {
-    content: '~';
-    color: #87CEEB;
 }
 
 .tile-forest {
     background-color: #228B22;
-    position: relative;
 }
 
-.tile-forest::after {
-    content: '🌲';
-    font-size: 20px;
+.unit {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    font-size: 24px;
 }
 
-.tile-selected {
-    outline: 2px solid yellow;
-    outline-offset: -2px;
-    z-index: 1;
+.movement-points {
+    position: absolute;
+    bottom: 5px;
+    right: 45%;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 10px;
+    z-index: 3;
+}
+
+.movement-cost {
+    position: absolute;
+    top: 5px;
+    left: 45%;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 10px;
+    z-index: 3;
+}
+
+.coords-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 10px;
+    pointer-events: none;
+    z-index: 2;
+    display: none;
 }
 
 #unit-panel {
@@ -110,108 +148,16 @@ button:hover {
     outline: 2px solid yellow;
 }
 
-.tile-unit {
-    position: relative;
-    z-index: 2;
-}
-
-.tile-unit::before {
+.possible-move::after {
+    content: '';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 20px;
-}
-
-.unit-WARRIOR::before {
-    content: '🗡️';
-    font-size: 20px;
-}
-
-.unit-SETTLER::before {
-    content: '👨‍🌾';
-    font-size: 20px;
-}
-
-.unit-ARCHER::before {
-    content: '🏹';
-    font-size: 20px;
-}
-
-.unit {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 30px;
-    height: 30px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2;
-}
-
-.possible-move {
-    position: relative;
-}
-
-.possible-move::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 255, 0, 0.2);
-    border: 2px solid rgba(0, 255, 0, 0.5);
-    pointer-events: none;
-}
-
-.movement-points {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
-    padding: 1px 3px;
-    border-radius: 3px;
-    font-size: 10px;
-}
-
-.selected-unit {
-    outline: 2px solid yellow;
-    z-index: 2;
-}
-
-.movement-cost {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
-    padding: 1px 3px;
-    border-radius: 3px;
-    font-size: 10px;
-    z-index: 3;
-}
-
-.possible-move {
-    position: relative;
-}
-
-.possible-move::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 255, 0, 0.2);
-    border: 2px solid rgba(0, 255, 0, 0.5);
-    pointer-events: none;
-}
-
-.possible-move.tile-mountains::after {
-    background: rgba(255, 165, 0, 0.2);
-    border-color: rgba(255, 165, 0, 0.5);
+    width: 10px;
+    height: 10px;
+    background-color: red;
+    border-radius: 50%;
+    z-index: 1;
+    opacity: 0.7;
 }

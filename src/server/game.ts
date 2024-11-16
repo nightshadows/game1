@@ -25,8 +25,8 @@ type TerrainType = 'PLAINS' | 'MOUNTAINS' | 'WATER' | 'FOREST';
 type ResourceType = 'FOOD' | 'PRODUCTION' | 'GOLD';
 
 interface Position {
-    x: number;
-    y: number;
+    row: number;
+    column: number;
 }
 
 interface Resources {
@@ -70,7 +70,7 @@ export class GameManager {
         this.games = new Map();
     }
 
-    createGame(): string {
+    public createGame(): string {
         const gameId = Math.random().toString(36).substring(7);
         const initialState = this.createInitialState();
         this.games.set(gameId, initialState);
@@ -81,7 +81,7 @@ export class GameManager {
         return gameId;
     }
 
-    getGameState(gameId: string): GameState | undefined {
+    public getGameState(gameId: string): GameState | undefined {
         const state = this.games.get(gameId);
         console.log('Getting game state:', {
             gameId,
@@ -104,43 +104,45 @@ export class GameManager {
         if (!game) return;
 
         // Find center of the map
-        const centerY = Math.floor(game.map.length / 2);
-        const centerX = Math.floor(game.map[0].length / 2);
+        const centerRow = Math.floor(game.map.length / 2);
+        const centerColumn = Math.floor(game.map[0].length / 2);
 
         // Make sure the center and adjacent tile are plains (for better start)
-        game.map[centerY][centerX].type = 'PLAINS';
-        game.map[centerY][centerX + 1].type = 'PLAINS';
+        game.map[centerRow][centerColumn].type = 'PLAINS';
+        game.map[centerRow][centerColumn + 1].type = 'PLAINS';
 
         // Place settler in center
-        game.map[centerY][centerX].unit = {
-            id: `SETTLER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        game.map[centerRow][centerColumn].unit = {
+            id: `SETTLER-${Date.now()}`,
             type: 'SETTLER',
-            position: { x: centerX, y: centerY },
+            position: { row: centerRow, column: centerColumn },
             owner: 'player1',
             movementPoints: 2,
             maxMovementPoints: 2
         };
 
         // Place warrior adjacent to settler
-        game.map[centerY][centerX + 1].unit = {
-            id: `WARRIOR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        game.map[centerRow][centerColumn + 1].unit = {
+            id: `WARRIOR-${Date.now()}`,
             type: 'WARRIOR',
-            position: { x: centerX + 1, y: centerY },
+            position: { row: centerRow, column: centerColumn + 1 },
             owner: 'player1',
             movementPoints: 2,
             maxMovementPoints: 2
         };
+
+        console.log('Placed starting units:', game.map[centerRow][centerColumn].unit, game.map[centerRow][centerColumn + 1].unit);
     }
 
     // When creating a new game, ensure all existing units are removed
     private generateMap(width: number, height: number): Tile[][] {
         const map: Tile[][] = [];
-        for (let y = 0; y < height; y++) {
-            map[y] = [];
-            for (let x = 0; x < width; x++) {
-                map[y][x] = {
+        for (let row = 0; row < height; row++) {
+            map[row] = [];
+            for (let column = 0; column < width; column++) {
+                map[row][column] = {
                     type: this.getRandomTerrainType(),
-                    position: { x, y },
+                    position: { row: row, column: column },
                     unit: undefined  // Explicitly set unit to undefined
                 };
             }
@@ -165,14 +167,14 @@ export class GameManager {
         return 'PLAINS';
     }
 
-    placeUnit(gameId: string, position: Position, unitType: string): boolean {
+    public placeUnit(gameId: string, position: Position, unitType: string): boolean {
         const game = this.games.get(gameId);
         if (!game) {
             console.log('Game not found:', gameId);
             return false;
         }
 
-        const tile = game.map[position.y][position.x];
+        const tile = game.map[position.row][position.column];
 
         if (tile.unit) {
             console.log('Tile already occupied');
@@ -197,7 +199,7 @@ export class GameManager {
         return true;
     }
 
-    moveUnit(gameId: string, unitId: string, newPosition: Position): boolean {
+    public moveUnit(gameId: string, unitId: string, newPosition: Position): boolean {
         const game = this.games.get(gameId);
         if (!game) return false;
 
@@ -225,7 +227,7 @@ export class GameManager {
         oldTile.unit = undefined;
         unit.position = newPosition;
         unit.movementPoints -= pathCost;
-        game.map[newPosition.y][newPosition.x].unit = unit;
+        game.map[newPosition.row][newPosition.column].unit = unit;
 
         return true;
     }
@@ -238,11 +240,11 @@ export class GameManager {
         const distances = new Map<string, PathNode>();
         const unvisited = new Set<string>();
 
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                const pos = `${x},${y}`;
+        for (let row = 0; row < rows; row++) {
+            for (let column = 0; column < cols; column++) {
+                const pos = `${row},${column}`;
                 distances.set(pos, {
-                    position: { x, y },
+                    position: { row, column },
                     cost: Infinity
                 });
                 unvisited.add(pos);
@@ -250,7 +252,7 @@ export class GameManager {
         }
 
         // Set start distance to 0
-        const startKey = `${start.x},${start.y}`;
+        const startKey = `${start.row},${start.column}`;
         distances.get(startKey)!.cost = 0;
 
         while (unvisited.size > 0) {
@@ -272,27 +274,37 @@ export class GameManager {
             unvisited.delete(current);
 
             // Check if we reached the end
-            const [x, y] = current.split(',').map(Number);
-            if (x === end.x && y === end.y) {
+            const [row, column] = current.split(',').map(Number);
+            if (row === end.row && column === end.column) {
                 return distances.get(current)!.cost;
             }
 
-            // Check neighbors
-            const neighbors = [
-                { x: x - 1, y }, // left
-                { x: x + 1, y }, // right
-                { x, y: y - 1 }, // up
-                { x, y: y + 1 }  // down
+            // Check hex neighbors instead of square neighbors
+            const isOddRow = row % 2 === 1;
+            const neighbors = isOddRow ? [
+                { row: row-1, column: column },         // top left
+                { row: row-1, column: column+1 },       // top right
+                { row: row, column: column+1 },         // right
+                { row: row, column: column-1 },         // left
+                { row: row+1, column: column },         // bottom left
+                { row: row+1, column: column+1 }         // bottom right
+            ] : [
+                { row: row-1, column: column-1 },       // top left
+                { row: row-1, column: column },         // top right
+                { row: row, column: column+1 },         // right
+                { row: row, column: column-1 },         // left
+                { row: row+1, column: column-1 },         // bottom left
+                { row: row+1, column: column }             // bottom right
             ];
 
             for (const neighbor of neighbors) {
-                if (neighbor.x < 0 || neighbor.x >= cols ||
-                    neighbor.y < 0 || neighbor.y >= rows) continue;
+                if (neighbor.row < 0 || neighbor.row >= rows ||
+                    neighbor.column < 0 || neighbor.column >= cols) continue;
 
-                const tile = map[neighbor.y][neighbor.x];
+                const tile = map[neighbor.row][neighbor.column];
                 if (tile.type === 'WATER' || tile.unit) continue;
 
-                const neighborKey = `${neighbor.x},${neighbor.y}`;
+                const neighborKey = `${neighbor.row},${neighbor.column}`;
                 if (!unvisited.has(neighborKey)) continue;
 
                 const cost = distances.get(current)!.cost + this.terrainMovementCosts[tile.type];
@@ -300,7 +312,7 @@ export class GameManager {
 
                 if (cost < neighborNode.cost) {
                     neighborNode.cost = cost;
-                    neighborNode.previous = { x, y };
+                    neighborNode.previous = { row, column };
                 }
             }
         }
@@ -308,10 +320,11 @@ export class GameManager {
         return null; // No path found
     }
 
-    endTurn(gameId: string) {
+    public endTurn(gameId: string): void {
         const game = this.games.get(gameId);
         if (!game) return;
 
+        // Reset movement points for all units
         for (const row of game.map) {
             for (const tile of row) {
                 if (tile.unit) {
@@ -322,10 +335,20 @@ export class GameManager {
     }
 
     private calculateDistance(pos1: Position, pos2: Position): number {
-        return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
+        // Convert axial coordinates to cube coordinates
+        const x1 = pos1.column - (pos1.row - (pos1.row & 1)) / 2;
+        const z1 = pos1.row;
+        const y1 = -x1 - z1;
+
+        const x2 = pos2.column - (pos2.row - (pos2.row & 1)) / 2;
+        const z2 = pos2.row;
+        const y2 = -x2 - z2;
+
+        // Return the hex distance
+        return Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2), Math.abs(z1 - z2));
     }
 
-    getMovementCost(tile: Tile): number {
+    public getMovementCost(tile: Tile): number {
         return this.terrainMovementCosts[tile.type] || Infinity;
     }
 }

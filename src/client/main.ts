@@ -1,3 +1,8 @@
+interface Position {
+    row: number;
+    column: number;
+}
+
 class Game {
     private ws: WebSocket;
     private map: HTMLElement;
@@ -54,11 +59,10 @@ class Game {
     }
 
     private findUnit(unitId: string): any {
-        if (!this.gameState?.map) return null;
-
         for (const row of this.gameState.map) {
             for (const tile of row) {
                 if (tile.unit?.id === unitId) {
+                    console.log('Found unit:', tile.unit);
                     return tile.unit;
                 }
             }
@@ -74,41 +78,45 @@ class Game {
     private renderMap() {
         if (!this.gameState?.map) return;
 
-        this.map.innerHTML = ''; // Clear existing map
-        const mapContainer = document.createElement('div');
-        mapContainer.style.display = 'grid';
-        mapContainer.style.gridTemplateColumns = `repeat(${this.gameState.map[0].length}, ${this.tileSize}px)`;
-        mapContainer.style.gap = '1px';
+        this.map.innerHTML = '';
+        const container = document.createElement('div');
+        container.className = 'hex-grid';
 
         for (let y = 0; y < this.gameState.map.length; y++) {
+            const row = document.createElement('div');
+            row.className = 'hex-row';
+
             for (let x = 0; x < this.gameState.map[y].length; x++) {
                 const tile = this.gameState.map[y][x];
                 const tileElement = this.createTileElement(tile);
-                mapContainer.appendChild(tileElement);
+                row.appendChild(tileElement);
             }
+
+            container.appendChild(row);
         }
 
-        this.map.appendChild(mapContainer);
+        this.map.appendChild(container);
     }
 
     private createTileElement(tile: any): HTMLElement {
         const tileElement = document.createElement('div');
         tileElement.className = 'tile';
-        tileElement.dataset.x = tile.position.x.toString();
-        tileElement.dataset.y = tile.position.y.toString();
-
-        // Set tile appearance based on type
         tileElement.classList.add(`tile-${tile.type.toLowerCase()}`);
 
-        // Debug log for unit
-        console.log('Tile data:', tile);
+        // Add coords label
+        const coordsLabel = document.createElement('div');
+        coordsLabel.className = 'coords-label';
+        coordsLabel.textContent = `(${tile.position.row},${tile.position.column})`;
+        tileElement.appendChild(coordsLabel);
+
+        // Add possible move indicator (red dot)
+        if (this.isPossibleMove(tile.position)) {
+            tileElement.classList.add('possible-move');
+        }
 
         // Add unit if present
         if (tile.unit) {
-            console.log('Adding unit to tile:', tile.unit);
-            const unitElement = document.createElement('div');
-            unitElement.className = `unit unit-${tile.unit.type}`;
-
+            const unitElement = this.createUnitElement(tile.unit);
             if (tile.unit.id === this.selectedUnitId) {
                 unitElement.classList.add('selected-unit');
             }
@@ -121,40 +129,27 @@ class Game {
             tileElement.appendChild(movementInfo);
         }
 
-        // Add tooltip
-        const tooltipText = `${tile.type}${tile.unit ? ` - ${tile.unit.type}` : ''} (${tile.position.x}, ${tile.position.y})`;
-        tileElement.title = tooltipText;
-
         tileElement.addEventListener('click', () => {
-            console.log('Tile clicked:', tile);
             this.handleTileClick(tile);
         });
-
-        // Update movement cost indicator to show path cost
-        if (this.isPossibleMove(tile.position)) {
-            tileElement.classList.add('possible-move');
-            const move = this.possibleMoves.find(m =>
-                m.x === tile.position.x && m.y === tile.position.y
-            );
-            const costIndicator = document.createElement('div');
-            costIndicator.className = 'movement-cost';
-            costIndicator.textContent = move?.cost.toString() || '';
-            tileElement.appendChild(costIndicator);
-        }
 
         return tileElement;
     }
 
-    private handleTileClick(tile: any) {
-        if (this.selectedUnit) {
-            this.placeUnit(tile.position.x, tile.position.y, this.selectedUnit);
-        } else if (tile.unit) {
-            this.selectUnitForMovement(tile.unit);
+    private handleTileClick(tile: { position: Position, unit?: any, type: string }) {
+        if (tile.unit) {
+            console.log('Selected unit:', tile.unit);
+            this.selectedUnitId = tile.unit.id;
+            this.calculatePossibleMoves(tile.unit);
+            this.renderMap();
         } else if (this.selectedUnitId && this.isPossibleMove(tile.position)) {
+            console.log('Moving unit to:', tile.position);
             this.moveUnit(this.selectedUnitId, tile.position);
+        } else {
+            this.selectedUnitId = null;
+            this.possibleMoves = [];
+            this.renderMap();
         }
-
-        this.highlightTile(tile.position);
     }
 
     private selectUnitForMovement(unit: any) {
@@ -165,122 +160,93 @@ class Game {
         if (unit.movementPoints > 0) {
             this.selectedUnitId = unit.id;
             this.calculatePossibleMoves(unit);
+            this.renderMap();
         } else {
             this.clearUnitSelection();
+            this.renderMap();
         }
-
-        this.renderMap();
     }
 
     private calculatePossibleMoves(unit: any) {
+        const startRow = unit.position.row;
+        const startCol = unit.position.column;
+
         this.possibleMoves = [];
-        const remainingPoints = unit.movementPoints;
+        const visited = new Map<string, number>();
+        const key = (row: number, col: number) => `${row},${col}`;
 
-        // Get all tiles within maximum range
-        for (let y = 0; y < this.gameState.map.length; y++) {
-            for (let x = 0; x < this.gameState.map[0].length; x++) {
-                const pathCost = this.calculatePathCost(unit.position, { x, y });
-                if (pathCost !== null && pathCost <= remainingPoints) {
-                    this.possibleMoves.push({
-                        x,
-                        y,
-                        cost: pathCost
-                    });
-                }
-            }
-        }
-    }
+        const queue: [number, number, number][] = [[startRow, startCol, unit.movementPoints]];
+        visited.set(key(startRow, startCol), 0);
 
-    private calculatePathCost(start: Position, end: Position): number | null {
-        const rows = this.gameState.map.length;
-        const cols = this.gameState.map[0].length;
-
-        // Initialize distances
-        const distances = new Map<string, PathNode>();
-        const unvisited = new Set<string>();
-
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                const pos = `${x},${y}`;
-                distances.set(pos, {
-                    position: { x, y },
-                    cost: Infinity
-                });
-                unvisited.add(pos);
-            }
-        }
-
-        // Set start distance to 0
-        const startKey = `${start.x},${start.y}`;
-        distances.get(startKey)!.cost = 0;
-
-        while (unvisited.size > 0) {
-            // Find minimum distance
-            let minDist = Infinity;
-            let current = '';
-
-            for (const pos of unvisited) {
-                const node = distances.get(pos)!;
-                if (node.cost < minDist) {
-                    minDist = node.cost;
-                    current = pos;
-                }
-            }
-
-            if (current === '' || minDist === Infinity) break;
-
-            // Remove current from unvisited
-            unvisited.delete(current);
-
-            // Check if we reached the end
-            const [x, y] = current.split(',').map(Number);
-            if (x === end.x && y === end.y) {
-                return distances.get(current)!.cost;
-            }
-
-            // Check neighbors
-            const neighbors = [
-                { x: x - 1, y }, // left
-                { x: x + 1, y }, // right
-                { x, y: y - 1 }, // up
-                { x, y: y + 1 }  // down
-            ];
+        while (queue.length > 0) {
+            const [row, col, points] = queue.shift()!;
+            const neighbors = this.getHexNeighbors(row, col);
 
             for (const neighbor of neighbors) {
-                if (neighbor.x < 0 || neighbor.x >= cols ||
-                    neighbor.y < 0 || neighbor.y >= rows) continue;
+                if (!this.isValidPosition(neighbor.row, neighbor.column)) {
+                    continue;
+                }
 
-                const tile = this.gameState.map[neighbor.y][neighbor.x];
-                if (tile.type === 'WATER' || tile.unit) continue;
+                const tile = this.gameState.map[neighbor.row][neighbor.column];
+                if (tile.type === 'WATER' || tile.unit) {
+                    continue;
+                }
 
-                const neighborKey = `${neighbor.x},${neighbor.y}`;
-                if (!unvisited.has(neighborKey)) continue;
+                const cost = this.getTerrainCost(tile.type);
+                const newKey = key(neighbor.row, neighbor.column);
+                const currentCost = visited.get(key(row, col))!;
+                const totalCost = currentCost + cost;
 
-                const cost = distances.get(current)!.cost + this.getTerrainCost(tile.type);
-                const neighborNode = distances.get(neighborKey)!;
+                if ((!visited.has(newKey) || visited.get(newKey)! > totalCost) &&
+                    totalCost <= unit.movementPoints) {
 
-                if (cost < neighborNode.cost) {
-                    neighborNode.cost = cost;
-                    neighborNode.previous = { x, y };
+                    visited.set(newKey, totalCost);
+                    queue.push([neighbor.row, neighbor.column, unit.movementPoints - totalCost]);
+
+                    if (!(neighbor.row === startRow && neighbor.column === startCol)) {
+                        this.possibleMoves.push({ row: neighbor.row, column: neighbor.column });
+                    }
                 }
             }
         }
-
-        return null; // No path found
     }
 
     private getTerrainCost(terrainType: string): number {
-        const costs: Record<string, number> = {
-            'PLAINS': 1,
-            'MOUNTAINS': 2,
-            'FOREST': 1,
-            'WATER': Infinity
-        };
-        return costs[terrainType] || Infinity;
+        switch (terrainType.toUpperCase()) {
+            case 'PLAINS':
+            case 'FOREST':
+                return 1;
+            case 'MOUNTAINS':
+                return 2;
+            case 'WATER':
+                return Infinity;
+            default:
+                return 1;
+        }
     }
 
-    private isPossibleMove(position: Position): boolean {
-        return this.possibleMoves.some(pos => pos.x === position.x && pos.y === position.y);
+    private getHexNeighbors(row: number, col: number): Position[] {
+        const isOddRow = row % 2 === 1;
+
+        if (isOddRow) {
+            return [
+                { row: row-1, column: col },     // top left
+                { row: row-1, column: col+1 },   // top right
+                { row: row, column: col+1 },     // right
+                { row: row, column: col },       // left
+                { row: row+1, column: col },     // bottom left
+                { row: row+1, column: col+1 }    // bottom right
+            ];
+        } else {
+            return [
+                { row: row-1, column: col-1 },   // top left
+                { row: row-1, column: col },     // top right
+                { row: row, column: col+1 },     // right
+                { row: row, column: col-1 },     // left
+                { row: row+1, column: col-1 },   // bottom left
+                { row: row+1, column: col }      // bottom right
+            ];
+        }
     }
 
     private moveUnit(unitId: string, newPosition: Position) {
@@ -288,16 +254,19 @@ class Game {
             type: 'MOVE_UNIT',
             payload: {
                 unitId,
-                position: newPosition
+                position: {
+                    row: newPosition.row,
+                    column: newPosition.column
+                }
             }
         }));
     }
 
-    private placeUnit(x: number, y: number, unitType: string) {
+    private placeUnit(row: number, column: number, unitType: string) {
         this.ws.send(JSON.stringify({
             type: 'PLACE_UNIT',
             payload: {
-                position: { x, y },
+                position: { row, column },
                 unitType
             }
         }));
@@ -364,6 +333,72 @@ class Game {
                     break;
                 }
             }
+        }
+    }
+
+    private isPossibleMove(position: Position): boolean {
+        return this.possibleMoves.some(move =>
+            move.row === position.row && move.column === position.column
+        );
+    }
+
+    private isValidPosition(row: number, col: number): boolean {
+        return row >= 0 && row < this.gameState.map.length &&
+               col >= 0 && col < this.gameState.map[0].length;
+    }
+
+    private highlightTile(tile: any) {
+        // First, remove highlight from all tiles
+        const tiles = document.querySelectorAll('.tile');
+        tiles.forEach(tile => {
+            tile.classList.remove('tile-highlighted');
+            tile.classList.remove('tile-possible-move');
+        });
+
+        // If we have a selected unit, highlight possible moves
+        if (this.selectedUnitId) {
+            this.possibleMoves.forEach(move => {
+                const tileElement = this.getTileElement(move.row, move.column);
+                if (tileElement) {
+                    tileElement.classList.add('tile-possible-move');
+                }
+            });
+        }
+
+        // Highlight the selected tile if it has a position
+        if (tile && tile.position) {
+            const tileElement = this.getTileElement(tile.position.row, tile.position.column);
+            if (tileElement) {
+                tileElement.classList.add('tile-highlighted');
+            }
+        }
+    }
+
+    private getTileElement(row: number, col: number): HTMLElement | null {
+        const coordsLabel = `(${row},${col})`;  // Changed to match new format
+        const tiles = document.querySelectorAll('.tile');
+        for (const tile of tiles) {
+            const label = tile.querySelector('.coords-label');
+            if (label && label.textContent === coordsLabel) {
+                return tile as HTMLElement;
+            }
+        }
+        return null;
+    }
+
+    private createUnitElement(unit: any): HTMLElement {
+        const unitElement = document.createElement('div');
+        unitElement.className = `unit unit-${unit.type}`;
+        unitElement.textContent = this.getUnitSymbol(unit.type);
+        return unitElement;
+    }
+
+    private getUnitSymbol(unitType: string): string {
+        switch (unitType) {
+            case 'WARRIOR': return '🗡️';
+            case 'SETTLER': return '👨‍🌾';
+            case 'ARCHER': return '🏹';
+            default: return '❓';
         }
     }
 }
