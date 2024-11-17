@@ -277,7 +277,7 @@ button:hover {
     padding: 10px;
     border-radius: 4px;
     width: 450px;
-    height: 200px;
+    height: 120px;
     overflow-y: auto;
     font-family: monospace;
     font-size: 14px;
@@ -304,4 +304,81 @@ button:hover {
 
 .log-experience {
     color: #2ecc71;
+}
+
+.log-level-up {
+    color: #f1c40f;  /* Golden yellow color */
+    font-weight: bold;
+}
+
+.unit-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 5px;
+}
+
+.action-button {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    background: #4a4a4a;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.action-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.action-button:not(:disabled):hover {
+    background: #5a5a5a;
+}
+
+.action-button.dismiss {
+    background: #c0392b;
+}
+
+.action-button.dismiss:hover {
+    background: #e74c3c;
+}
+
+.status {
+    color: #3498db;
+    margin-top: 5px;
+}
+
+.log-status {
+    color: #3498db;  // Blue color for status changes
+    font-weight: bold;
+}
+
+.unit-info-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.unit-info-main {
+    flex: 1;
+}
+
+.unit-status {
+    color: #3498db;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(52, 152, 219, 0.1);
+    margin-left: 10px;
+    white-space: nowrap;
+}
+
+/* Update existing style */
+#unit-info-panel > div {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }

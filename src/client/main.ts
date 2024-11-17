@@ -24,6 +24,11 @@ class Game {
         this.initializeUnitControls();
         this.infoPanel = document.getElementById('unit-info-panel')!;
         this.showEmptyInfoPanel();
+
+        (window as any).game.confirmDismissUnit = this.confirmDismissUnit.bind(this);
+        (window as any).game.dismissUnit = this.dismissUnit.bind(this);
+        (window as any).game.levelUpUnit = this.levelUpUnit.bind(this);
+        (window as any).game.fortifyUnit = this.fortifyUnit.bind(this);
     }
 
     private initializeWebSocket() {
@@ -55,16 +60,35 @@ class Game {
                 const previousState = this.gameState;
                 this.gameState = data.state;
 
+                // If this update was from a fortify action, add the log message
+                if (data.fortified) {
+                    const unit = this.findUnit(data.fortified.unitId);
+                    if (unit) {
+                        this.addCombatLog(`
+                            <span class="log-status">
+                                🛡️ ${this.getUnitSymbol(unit.type)} ${unit.type} is now fortified (+5 defense)
+                            </span>
+                        `);
+                    }
+                }
+
+                // Clear selection if the selected unit was dismissed
+                if (this.selectedUnitId) {
+                    const unit = this.findUnit(this.selectedUnitId);
+                    if (!unit) {
+                        this.clearUnitSelection();
+                        this.showEmptyInfoPanel();
+                    }
+                }
+
                 // Check for combat results
                 if (data.combatResult) {
                     const {
                         attackerDamage, defenderDamage,
                         attackerDied, defenderDied,
-                        experienceGained,
+                        attackerXP, defenderXP,
                         attackerType, defenderType,
-                        attackerLevel, defenderLevel,
-                        attackerPlayer, defenderPlayer,
-                        attackerLevelUp, defenderLevelUp
+                        attackerPlayer, defenderPlayer
                     } = data.combatResult;
 
                     // Combat message
@@ -82,19 +106,14 @@ class Game {
                         logMessage += `<br><span class="log-death">💀 ${deadUnit} (${deadPlayer}) was defeated!</span>`;
                     }
 
-                    if (experienceGained > 0) {
-                        logMessage += `<br><span class="log-experience">⭐ +${experienceGained} XP gained</span>`;
+                    if (attackerXP > 0) {
+                        logMessage += `<br><span class="log-experience">⭐ ${attackerType} gained ${attackerXP} XP</span>`;
+                    }
+                    if (defenderXP > 0) {
+                        logMessage += `<br><span class="log-experience">⭐ ${defenderType} gained ${defenderXP} XP</span>`;
                     }
 
                     this.addCombatLog(logMessage);
-
-                    // Add level-up messages after combat message
-                    if (attackerLevelUp?.levelGained) {
-                        this.addCombatLog(`<span class="log-experience">🎖️ ${attackerType} (${attackerPlayer}) reached level ${attackerLevelUp.newLevel}!</span>`);
-                    }
-                    if (defenderLevelUp?.levelGained) {
-                        this.addCombatLog(`<span class="log-experience">🎖️ ${defenderType} (${defenderPlayer}) reached level ${defenderLevelUp.newLevel}!</span>`);
-                    }
                 }
 
                 // Update info panel based on selected unit first
@@ -562,24 +581,51 @@ class Game {
     private updateInfoPanel(unit: any) {
         this.infoPanel.className = '';
         this.infoPanel.innerHTML = `
-            <div>
-                <div style="font-size: 16px; margin-bottom: 5px;">
-                    ${this.getUnitSymbol(unit.type)} ${unit.type}
-                    <span style="color: #aaa;">Level ${unit.level}</span>
-                </div>
-                <div class="health-bar">
-                    <div class="health-bar-fill"
-                         style="width: ${(unit.currentHealth / unit.maxHealth) * 100}%;
-                                background: ${this.getHealthBarColor(unit.currentHealth, unit.maxHealth)};">
+            <div class="unit-info-content">
+                <div class="unit-info-main">
+                    <div style="font-size: 16px; margin-bottom: 5px;">
+                        ${this.getUnitSymbol(unit.type)} ${unit.type}
+                        <span style="color: #aaa;">Level ${unit.level}</span>
                     </div>
+                    <div class="health-bar">
+                        <div class="health-bar-fill"
+                             style="width: ${(unit.currentHealth / unit.maxHealth) * 100}%;
+                                    background: ${this.getHealthBarColor(unit.currentHealth, unit.maxHealth)};">
+                        </div>
+                    </div>
+                    <div style="color: ${this.getHealthBarColor(unit.currentHealth, unit.maxHealth)}">
+                        HP: ${unit.currentHealth}/${unit.maxHealth}
+                    </div>
+                    <div>Attack: ${unit.attackStrength} (Range: ${unit.range})</div>
+                    <div>XP: ${unit.experience}/${this.XP_PER_LEVEL}</div>
+                    <div>Movement: ${unit.movementPoints}/${unit.maxMovementPoints}</div>
                 </div>
-                <div style="color: ${this.getHealthBarColor(unit.currentHealth, unit.maxHealth)}">
-                    HP: ${unit.currentHealth}/${unit.maxHealth}
-                </div>
-                <div>Attack: ${unit.attackStrength} (Range: ${unit.range})</div>
-                <div>XP: ${unit.experience}/${this.XP_PER_LEVEL}</div>
-                <div>Movement: ${unit.movementPoints}/${unit.maxMovementPoints}</div>
+                ${unit.fortified ? '<div class="unit-status">🛡️ Fortified</div>' : ''}
             </div>
+
+            ${unit.ownerId === this.playerId ? `
+                <div class="unit-actions">
+                    <button
+                        class="action-button fortify"
+                        ${unit.movementPoints <= 0 || unit.fortified ? 'disabled' : ''}
+                        onclick="window.game.fortifyUnit('${unit.id}')">
+                        🛡️ Fortify
+                    </button>
+                    ${unit.experience >= this.XP_PER_LEVEL ? `
+                        <button
+                            class="action-button level-up"
+                            ${unit.movementPoints <= 0 ? 'disabled' : ''}
+                            onclick="window.game.levelUpUnit('${unit.id}')">
+                            ⭐ Level Up
+                        </button>
+                    ` : ''}
+                    <button
+                        class="action-button dismiss"
+                        onclick="window.game.confirmDismissUnit('${unit.id}')">
+                        ❌ Dismiss
+                    </button>
+                </div>
+            ` : ''}
         `;
     }
 
@@ -607,8 +653,59 @@ class Game {
             logWindow.innerHTML = '';
         }
     }
+
+    private fortifyUnit(unitId: string) {
+        const unit = this.findUnit(unitId);
+        if (!unit || unit.movementPoints <= 0) {
+            return;
+        }
+
+        this.ws.send(JSON.stringify({
+            type: 'FORTIFY_UNIT',
+            payload: { unitId }
+        }));
+
+        // We'll move the combat log message to handleServerMessage
+        // because we want to show it only after successful fortification
+    }
+
+    private levelUpUnit(unitId: string) {
+        // Find the unit before the level up to get its type
+        const unit = this.findUnit(unitId);
+        if (!unit) return;
+
+        this.ws.send(JSON.stringify({
+            type: 'LEVEL_UP_UNIT',
+            payload: { unitId }
+        }));
+
+        // Add level up message to combat log
+        this.addCombatLog(`
+            <span class="log-level-up">
+                🌟 ${this.getUnitSymbol(unit.type)} ${unit.type} reached level ${unit.level + 1}!<br>
+                💪 Attack increased by 10<br>
+                ❤️ Unit healed
+            </span>
+        `);
+    }
+
+    private confirmDismissUnit(unitId: string) {
+        if (confirm('Are you sure you want to dismiss this unit?')) {
+            console.log('Sending dismiss request for unit:', unitId); // Debug log
+            this.dismissUnit(unitId);
+        }
+    }
+
+    private dismissUnit(unitId: string) {
+        this.ws.send(JSON.stringify({
+            type: 'DISMISS_UNIT',
+            payload: { unitId }
+        }));
+    }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
     new Game();
 });
+
+(window as any).game = new Game();

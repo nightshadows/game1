@@ -48,71 +48,83 @@ export class CombatManager {
     }
 
     public resolveCombat(attacker: Unit, defender: Unit): CombatResult {
-        // Store initial levels
         const initialAttackerLevel = attacker.level;
         const initialDefenderLevel = defender.level;
 
-        // Calculate base damages
-        let attackerDamage = this.calculateDamage(attacker.attackStrength, attacker.level);
-        let defenderDamage = defender.range === 0 ? 0 : this.calculateDamage(defender.attackStrength, defender.level);
-
-        // No retaliation for archer attacks
-        if (attacker.type === 'ARCHER') {
-            defenderDamage = 0;
+        // Remove fortification status when attacking
+        if (attacker.fortified) {
+            attacker.fortified = false;
         }
+
+        // Calculate damage with fortification bonus
+        const attackerDamage = this.calculateDamage(attacker, defender);
+        const defenderDamage = this.canCounterAttack(attacker, defender) ?
+            this.calculateDamage(defender, attacker) : 0;
 
         // Apply damage
         defender.currentHealth -= attackerDamage;
-        attacker.currentHealth -= defenderDamage;
-
-        // Determine if any unit died (only one can die)
-        let attackerDied = false;
-        let defenderDied = false;
-
-        if (defender.currentHealth <= 0 && attacker.currentHealth <= 0) {
-            // If both would die, randomly choose one to survive with 1 HP
-            if (Math.random() < 0.5) {
-                defender.currentHealth = 1;
-                attackerDied = true;
-            } else {
-                attacker.currentHealth = 1;
-                defenderDied = true;
-            }
-        } else {
-            attackerDied = attacker.currentHealth <= 0;
-            defenderDied = defender.currentHealth <= 0;
+        if (defenderDamage > 0) {
+            attacker.currentHealth -= defenderDamage;
         }
 
-        // Calculate and apply experience
-        const experienceGained = this.calculateExperience(attackerDied || defenderDied);
-        const attackerLevelUp = !attackerDied ? this.applyExperience(attacker, experienceGained) : null;
-        const defenderLevelUp = !defenderDied ? this.applyExperience(defender, experienceGained) : null;
+        // Check for deaths
+        const attackerDied = attacker.currentHealth <= 0;
+        const defenderDied = defender.currentHealth <= 0;
+
+        // Calculate experience gained for both units
+        let attackerXP = 0;
+        let defenderXP = 0;
+
+        // Award XP for dealing damage
+        if (attacker.ownerId === 'player1') {
+            attackerXP = Math.ceil(attackerDamage * 0.5); // 0.5 XP per point of damage dealt
+            if (defenderDied) {
+                attackerXP += 20; // Bonus XP for defeating an enemy
+            }
+            attacker.experience += attackerXP;
+        }
+
+        // Award XP for defending and counter-attacking
+        if (defender.ownerId === 'player1' && !defenderDied) {
+            defenderXP = Math.ceil(defenderDamage * 0.5); // 0.5 XP per point of damage dealt
+            if (attackerDied) {
+                defenderXP += 20; // Bonus XP for defeating an enemy
+            }
+            defender.experience += defenderXP;
+        }
 
         return {
             attackerDamage,
             defenderDamage,
             attackerDied,
             defenderDied,
-            experienceGained,
-            attackerLevelUp,
-            defenderLevelUp,
+            attackerXP,    // New field
+            defenderXP,    // New field
+            attackerLevelUp: null,
+            defenderLevelUp: null,
             initialAttackerLevel,
             initialDefenderLevel
         };
     }
 
-    private calculateDamage(baseStrength: number, level: number): number {
-        const levelBonus = (level - 1) * 0.1; // 10% damage increase per level
-        const baseDamage = baseStrength * (1 + levelBonus);
-        const variance = baseDamage * this.DAMAGE_VARIANCE;
-        return Math.round(baseDamage + (Math.random() * variance * 2 - variance));
+    private calculateDamage(attacker: Unit, defender: Unit): number {
+        let attackStrength = attacker.attackStrength;
+
+        // Add fortification bonus for defending units
+        if (defender.fortified) {
+            attackStrength -= 5;  // Reduce incoming damage by 5
+        }
+
+        // Ensure minimum damage of 1
+        const damage = Math.max(1, attackStrength);
+        return damage;
     }
 
-    private calculateExperience(unitDied: boolean): number {
-        return this.BASE_XP_GAIN * (unitDied ? 2 : 1);
+    private calculateExperienceGain(defender: Unit): number {
+        return this.BASE_XP_GAIN * (defender.level - 1);
     }
 
-    private applyExperience(unit: Unit, xp: number): { levelGained: boolean, newLevel?: number } {
+    public applyExperience(unit: Unit, xp: number): { levelGained: boolean; newLevel?: number } {
         unit.experience += xp;
         let levelGained = false;
         let newLevel;
@@ -128,5 +140,45 @@ export class CombatManager {
         }
 
         return { levelGained, newLevel };
+    }
+
+    // Add this method to handle manual level ups
+    public levelUpUnit(unit: Unit): void {
+        // Only allow level up if unit has enough XP
+        if (unit.experience < 100) return;
+
+        // Increase level
+        unit.level++;
+
+        // Spend XP
+        unit.experience -= 100;
+
+        // Increase strength
+        unit.attackStrength += 10;
+
+        // Heal by 50, but don't exceed max health
+        unit.currentHealth = Math.min(unit.maxHealth, unit.currentHealth + 50);
+
+        // Spend all movement points
+        unit.movementPoints = 0;
+    }
+
+    // Add this new helper method
+    private canCounterAttack(attacker: Unit, defender: Unit): boolean {
+        // Ranged attackers (range > 1) don't receive counter-attacks
+        if (attacker.range > 1) {
+            return false;
+        }
+
+        return defender.attackStrength > 0;
+    }
+
+    // Add this new method
+    public fortifyUnit(unit: Unit): void {
+        if (unit.movementPoints <= 0) {
+            return;
+        }
+        unit.fortified = true;
+        unit.movementPoints = 0;
     }
 }

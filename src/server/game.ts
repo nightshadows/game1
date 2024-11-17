@@ -1,5 +1,5 @@
 import { MapGenerator } from './mapGenerator';
-import { GameState, TerrainType, Tile, Position, Unit, PathNode, Player } from './types';
+import { GameState, TerrainType, Tile, Position, Unit, PathNode, Player, Game } from './types';
 import { CombatManager } from './combatManager';
 
 export class GameManager {
@@ -18,6 +18,8 @@ export class GameManager {
         'FOREST': 1,
         'WATER': Infinity
     };
+
+    private readonly XP_PER_LEVEL = 100;
 
     constructor() {
         this.games = new Map();
@@ -195,6 +197,10 @@ export class GameManager {
         unit.movementPoints -= pathCost;
         game.map[newPosition.row][newPosition.column].unit = unit;
 
+        if (unit.fortified) {
+            unit.fortified = false;  // Remove fortification when moving
+        }
+
         return true;
     }
 
@@ -365,5 +371,71 @@ export class GameManager {
             attackerPlayer: attacker.ownerId === 'neutral' ? 'Neutral Forces' : 'Player 1',
             defenderPlayer: defender.ownerId === 'neutral' ? 'Neutral Forces' : 'Player 1'
         };
+    }
+
+    private findUnit(game: Game, unitId: string): Unit | undefined {
+        for (const row of game.map) {
+            for (const tile of row) {
+                if (tile.unit?.id === unitId) {
+                    return tile.unit;
+                }
+            }
+        }
+        return undefined;
+    }
+
+    public fortifyUnit(gameId: string, playerId: string, unitId: string): boolean {
+        const game = this.games.get(gameId);
+        if (!game) return false;
+
+        const unit = this.findUnit(game, unitId);
+        if (!unit ||
+            unit.ownerId !== playerId ||
+            unit.fortified) {
+            return false;
+        }
+
+        this.combatManager.fortifyUnit(unit);
+        return true;
+    }
+
+    public levelUpUnit(gameId: string, playerId: string, unitId: string): boolean {
+        const game = this.games.get(gameId);
+        if (!game) return false;
+
+        const unit = this.findUnit(game, unitId);
+        if (!unit ||
+            unit.ownerId !== playerId ||
+            unit.experience < this.XP_PER_LEVEL ||
+            unit.movementPoints <= 0) {
+            return false;
+        }
+
+        this.combatManager.levelUpUnit(unit);
+        return true;
+    }
+
+    public dismissUnit(gameId: string, playerId: string, unitId: string): boolean {
+        const game = this.games.get(gameId);
+        if (!game) {
+            console.log('Game not found:', gameId); // Debug log
+            return false;
+        }
+
+        console.log('Attempting to dismiss unit:', { gameId, playerId, unitId }); // Debug log
+
+        for (let row = 0; row < game.map.length; row++) {
+            for (let col = 0; col < game.map[row].length; col++) {
+                const tile = game.map[row][col];
+                if (tile.unit?.id === unitId && tile.unit.ownerId === playerId) {
+                    console.log('Found unit to dismiss at:', row, col); // Debug log
+                    tile.unit = undefined;
+                    return true;
+                }
+            }
+        }
+
+        console.log('Unit not found or not owned by player'); // Debug log
+        return false;
     }
 }

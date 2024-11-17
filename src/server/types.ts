@@ -47,6 +47,7 @@ export interface Unit {
     range: number;
     level: number;
     experience: number;
+    fortified?: boolean;
 }
 
 export interface UnitConfig {
@@ -62,9 +63,15 @@ export interface CombatResult {
     defenderDamage: number;
     attackerDied: boolean;
     defenderDied: boolean;
-    experienceGained: number;
+    attackerXP: number;
+    defenderXP: number;
     attackerLevelUp: { levelGained: boolean; newLevel?: number } | null;
     defenderLevelUp: { levelGained: boolean; newLevel?: number } | null;
     initialAttackerLevel: number;
     initialDefenderLevel: number;
+}
+
+export interface Game {
+    map: Tile[][];
+    currentPlayerId: string;
 }
