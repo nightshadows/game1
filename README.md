@@ -7,7 +7,7 @@ A turn-based strategy game built with TypeScript, WebSocket, and Vite.
 Install dependencies
 
     npm install
-    
+
 Start development server
 
     npm run dev

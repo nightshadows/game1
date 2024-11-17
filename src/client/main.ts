@@ -11,6 +11,10 @@ class Game {
     private selectedUnit: string | null = null;
     private selectedUnitId: string | null = null;
     private possibleMoves: Position[] = [];
+    private playerId: string | null = null;
+    private readonly XP_PER_LEVEL = 100;
+    private infoPanel: HTMLElement;
+    private lastClickedUnit: any = null;
 
     constructor() {
         this.map = document.getElementById('map')!;
@@ -18,6 +22,8 @@ class Game {
         this.initializeWebSocket();
         this.initializeControls();
         this.initializeUnitControls();
+        this.infoPanel = document.getElementById('unit-info-panel')!;
+        this.showEmptyInfoPanel();
     }
 
     private initializeWebSocket() {
@@ -37,17 +43,76 @@ class Game {
         switch (data.type) {
             case 'GAME_CREATED':
                 this.gameState = data.state;
+                this.playerId = data.playerId;
+                this.lastClickedUnit = null;
+                this.selectedUnitId = null;
+                this.showEmptyInfoPanel();
+                this.clearCombatLog();
                 this.renderMap();
                 this.centerMapOnStartingUnits();
                 break;
             case 'GAME_UPDATED':
+                const previousState = this.gameState;
                 this.gameState = data.state;
+
+                // Check for combat results
+                if (data.combatResult) {
+                    const {
+                        attackerDamage, defenderDamage,
+                        attackerDied, defenderDied,
+                        experienceGained,
+                        attackerType, defenderType,
+                        attackerLevel, defenderLevel
+                    } = data.combatResult;
+
+                    let logMessage = `
+                        <span class="log-damage">⚔️ Level ${attackerLevel} ${attackerType} attacks Level ${defenderLevel} ${defenderType}!</span><br>
+                        <span class="log-damage">➡️ Deals ${attackerDamage} damage</span>`;
+
+                    if (defenderDamage > 0) {
+                        logMessage += `<br><span class="log-damage">↩️ Counter attack: ${defenderDamage} damage</span>`;
+                    }
+
+                    if (attackerDied || defenderDied) {
+                        const deadUnit = attackerDied ? attackerType : defenderType;
+                        const deadLevel = attackerDied ? attackerLevel : defenderLevel;
+                        logMessage += `<br><span class="log-death">💀 Level ${deadLevel} ${deadUnit} was defeated!</span>`;
+                    }
+
+                    if (experienceGained > 0) {
+                        logMessage += `<br><span class="log-experience">⭐ +${experienceGained} XP gained</span>`;
+                    }
+
+                    this.addCombatLog(logMessage);
+                }
+
+                // Update info panel based on selected unit first
+                if (this.selectedUnitId) {
+                    const selectedUnit = this.findUnit(this.selectedUnitId);
+                    if (selectedUnit) {
+                        this.updateInfoPanel(selectedUnit);
+                    }
+                }
+                // If no selected unit but we have a last clicked unit, show that instead
+                else if (this.lastClickedUnit) {
+                    const clickedUnit = this.findUnit(this.lastClickedUnit.id);
+                    if (clickedUnit) {
+                        this.lastClickedUnit = clickedUnit;
+                        this.updateInfoPanel(clickedUnit);
+                    } else {
+                        this.lastClickedUnit = null;
+                        this.showEmptyInfoPanel();
+                    }
+                }
+
+                // Rest of update handling
                 if (this.selectedUnitId) {
                     const unit = this.findUnit(this.selectedUnitId);
                     if (unit) {
                         this.calculatePossibleMoves(unit);
                     } else {
                         this.clearUnitSelection();
+                        this.showEmptyInfoPanel();
                     }
                 }
                 if (this.selectedUnit) {
@@ -137,13 +202,47 @@ class Game {
     }
 
     private handleTileClick(tile: { position: Position, unit?: any, type: string }) {
+        if (tile.unit) {
+            // Always show info for clicked unit
+            this.lastClickedUnit = tile.unit;
+            this.updateInfoPanel(tile.unit);
+
+            // If we have a selected unit and clicked on an enemy/neutral unit, initiate combat
+            if (this.selectedUnitId) {
+                const selectedUnit = this.findUnit(this.selectedUnitId);
+                if (selectedUnit &&
+                    tile.unit.ownerId !== this.playerId &&
+                    selectedUnit.ownerId === this.playerId) {
+
+                    // Check if target is within range
+                    const distance = this.calculateDistance(selectedUnit.position, tile.position);
+                    if (distance <= selectedUnit.range) {
+                        this.ws.send(JSON.stringify({
+                            type: 'ATTACK',
+                            attackerPos: selectedUnit.position,
+                            defenderPos: tile.position
+                        }));
+                        return;
+                    }
+                }
+            }
+        } else {
+            this.lastClickedUnit = null;
+            this.showEmptyInfoPanel();
+        }
+
+        if (tile.unit && tile.unit.ownerId !== this.playerId) {
+            console.log('Cannot control neutral/enemy units');
+            return;
+        }
+
         if (this.selectedUnit && !tile.unit && tile.type !== 'WATER') {
             console.log('Placing new unit:', this.selectedUnit);
             this.placeUnit(tile.position.row, tile.position.column, this.selectedUnit);
             return;
         }
 
-        if (tile.unit) {
+        if (tile.unit && tile.unit.ownerId === this.playerId) {
             console.log('Selected unit:', tile.unit);
             this.selectedUnitId = tile.unit.id;
             this.calculatePossibleMoves(tile.unit);
@@ -392,10 +491,28 @@ class Game {
         return null;
     }
 
+    private getHealthBarColor(currentHealth: number, maxHealth: number): string {
+        const healthPercent = (currentHealth / maxHealth) * 100;
+        if (healthPercent > 66) return '#2ecc71'; // Green
+        if (healthPercent > 33) return '#f1c40f'; // Yellow
+        return '#e74c3c'; // Red
+    }
+
     private createUnitElement(unit: any): HTMLElement {
         const unitElement = document.createElement('div');
         unitElement.className = `unit unit-${unit.type}`;
-        unitElement.textContent = this.getUnitSymbol(unit.type);
+
+        if (unit.ownerId === this.playerId) {
+            unitElement.classList.add('unit-owned');
+        } else if (unit.ownerId === 'neutral') {
+            unitElement.classList.add('unit-neutral');
+        }
+
+        // Just show the unit symbol
+        const symbolElement = document.createElement('span');
+        symbolElement.textContent = this.getUnitSymbol(unit.type);
+        unitElement.appendChild(symbolElement);
+
         return unitElement;
     }
 
@@ -405,6 +522,75 @@ class Game {
             case 'SETTLER': return '👨‍🌾';
             case 'ARCHER': return '🏹';
             default: return '❓';
+        }
+    }
+
+    private showEmptyInfoPanel() {
+        this.infoPanel.className = 'empty';
+        this.infoPanel.innerHTML = `
+            <div style="text-align: center;">
+                No unit selected
+            </div>
+        `;
+    }
+
+    private calculateDistance(pos1: Position, pos2: Position): number {
+        // Convert axial coordinates to cube coordinates
+        const x1 = pos1.column - (pos1.row - (pos1.row & 1)) / 2;
+        const z1 = pos1.row;
+        const y1 = -x1 - z1;
+
+        const x2 = pos2.column - (pos2.row - (pos2.row & 1)) / 2;
+        const z2 = pos2.row;
+        const y2 = -x2 - z2;
+
+        // Return the hex distance
+        return Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2), Math.abs(z1 - z2));
+    }
+
+    private updateInfoPanel(unit: any) {
+        this.infoPanel.className = '';
+        this.infoPanel.innerHTML = `
+            <div>
+                <div style="font-size: 16px; margin-bottom: 5px;">
+                    ${this.getUnitSymbol(unit.type)} ${unit.type}
+                    <span style="color: #aaa;">Level ${unit.level}</span>
+                </div>
+                <div class="health-bar">
+                    <div class="health-bar-fill"
+                         style="width: ${(unit.currentHealth / unit.maxHealth) * 100}%;
+                                background: ${this.getHealthBarColor(unit.currentHealth, unit.maxHealth)};">
+                    </div>
+                </div>
+                <div style="color: ${this.getHealthBarColor(unit.currentHealth, unit.maxHealth)}">
+                    HP: ${unit.currentHealth}/${unit.maxHealth}
+                </div>
+                <div>Attack: ${unit.attackStrength} (Range: ${unit.range})</div>
+                <div>XP: ${unit.experience}/${this.XP_PER_LEVEL}</div>
+                <div>Movement: ${unit.movementPoints}/${unit.maxMovementPoints}</div>
+            </div>
+        `;
+    }
+
+    private addCombatLog(message: string) {
+        const logWindow = document.getElementById('combat-log');
+        if (!logWindow) return;
+
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = message;
+        logWindow.insertBefore(entry, logWindow.firstChild);
+
+        // Keep only the last 50 messages
+        while (logWindow.children.length > 50) {
+            logWindow.removeChild(logWindow.lastChild!);
+        }
+    }
+
+    private clearCombatLog() {
+        const logWindow = document.getElementById('combat-log');
+        if (logWindow) {
+            logWindow.innerHTML = '';
         }
     }
 }

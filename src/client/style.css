@@ -20,10 +20,13 @@
 
 #controls {
     display: flex;
-    gap: 10px;
+    gap: 20px;
+    padding: 10px;
+    background: #2a2a2a;
+    border-radius: 4px;
 }
 
-button {
+#buttons button {
     padding: 10px 20px;
     cursor: pointer;
     background-color: #4CAF50;
@@ -60,7 +63,7 @@ button:hover {
     margin: 0;
     border: none;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-    /*    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);*/
+    overflow: hidden;
 }
 
 .tile:hover {
@@ -117,11 +120,46 @@ button:hover {
 
 .unit {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 2;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     font-size: 24px;
+    z-index: 2;
+}
+
+/* Unit level badge */
+.unit-level {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 10px;
+    padding: 1px 3px;
+    border-radius: 3px;
+    z-index: 3;
+}
+
+/* Unit info tooltip - positioned relative to the game container */
+.unit-info {
+    display: none;
+    position: fixed;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Show tooltip on hover */
+.unit:hover .unit-info {
+    display: block;
 }
 
 .movement-points {
@@ -173,11 +211,11 @@ button:hover {
 
 .unit-button {
     margin-right: 10px;
-    background-color: #4a4a4a;
+    background-color: #4a4a4a !important;
 }
 
 .unit-button.selected {
-    background-color: #2a2a2a;
+    background-color: #2a2a2a !important;
     outline: 2px solid yellow;
 }
 
@@ -193,4 +231,75 @@ button:hover {
     border-radius: 50%;
     z-index: 1;
     opacity: 0.7;
+}
+
+.unit-owned {
+    filter: drop-shadow(0 0 2px yellow);  /* Add glow effect to owned units */
+}
+
+.unit-neutral {
+    filter: grayscale(100%);  /* Make neutral units gray */
+    opacity: 0.8;  /* Slightly transparent */
+}
+
+#unit-info-panel {
+    display: flex;
+    align-items: center;
+    min-width: 300px;
+    height: 120px;  /* Fixed height to prevent resizing */
+    padding: 10px;
+    background: #3a3a3a;
+    border-radius: 4px;
+    color: white;
+    font-size: 14px;
+}
+
+#unit-info-panel.empty {
+    color: #666;
+    justify-content: center;
+    align-items: center;
+}
+
+#unit-info-panel > div {
+    width: 100%;  /* Ensure content takes full width */
+}
+
+#buttons {
+    display: flex;
+    gap: 10px;
+}
+
+#combat-log {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    width: 300px;
+    height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+.log-entry {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-damage {
+    color: #e74c3c;
+}
+
+.log-death {
+    color: #c0392b;
+    font-weight: bold;
+}
+
+.log-experience {
+    color: #2ecc71;
 }

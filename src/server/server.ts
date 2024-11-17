@@ -15,27 +15,30 @@ app.use(express.static('dist'));
 wss.on('connection', (ws) => {
     console.log('New client connected');
     let currentGameId: string | null = null;
+    let playerId: string | null = null;
 
-    ws.on('message', (message) => {
-        const data = JSON.parse(message.toString());
-        console.log('Received message:', data);
+    ws.on('message', (message: string) => {
+        const data = JSON.parse(message);
 
         switch (data.type) {
             case 'NEW_GAME':
                 currentGameId = gameManager.createGame();
+                playerId = 'player1';
                 console.log('Created new game:', currentGameId);
                 ws.send(JSON.stringify({
                     type: 'GAME_CREATED',
                     gameId: currentGameId,
+                    playerId: playerId,
                     state: gameManager.getGameState(currentGameId)
                 }));
                 break;
 
             case 'PLACE_UNIT':
-                if (currentGameId) {
+                if (currentGameId && playerId) {
                     console.log('Attempting to place unit:', data.payload);
                     const success = gameManager.placeUnit(
                         currentGameId,
+                        playerId,
                         data.payload.position,
                         data.payload.unitType
                     );
@@ -48,14 +51,15 @@ wss.on('connection', (ws) => {
                         }));
                     }
                 } else {
-                    console.log('No active game for unit placement');
+                    console.log('No active game or player for unit placement');
                 }
                 break;
 
             case 'MOVE_UNIT':
-                if (currentGameId) {
+                if (currentGameId && playerId) {
                     const success = gameManager.moveUnit(
                         currentGameId,
+                        playerId,
                         data.payload.unitId,
                         data.payload.position
                     );
@@ -75,6 +79,30 @@ wss.on('connection', (ws) => {
                         type: 'GAME_UPDATED',
                         state: gameManager.getGameState(currentGameId)
                     }));
+                }
+                break;
+
+            case 'ATTACK':
+                if (currentGameId && playerId) {
+                    const attackSuccess = gameManager.attackUnit(
+                        currentGameId,
+                        playerId,
+                        data.attackerPos,
+                        data.defenderPos
+                    );
+
+                    if (attackSuccess && currentGameId) {
+                        const newState = gameManager.getGameState(currentGameId);
+                        wss.clients.forEach(client => {
+                            if (client.readyState === WebSocket.OPEN) {
+                                client.send(JSON.stringify({
+                                    type: 'GAME_UPDATED',
+                                    state: newState,
+                                    combatResult: attackSuccess
+                                }));
+                            }
+                        });
+                    }
                 }
                 break;
         }

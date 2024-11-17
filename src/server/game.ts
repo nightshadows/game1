@@ -1,9 +1,17 @@
 import { MapGenerator } from './mapGenerator';
-import { GameState, TerrainType, Tile, Position, Unit, PathNode } from './types';
+import { GameState, TerrainType, Tile, Position, Unit, PathNode, Player } from './types';
+import { CombatManager } from './combatManager';
 
 export class GameManager {
     private games: Map<string, GameState>;
     private mapGenerator: MapGenerator;
+    private combatManager: CombatManager;
+    private readonly NEUTRAL_PLAYER: Player = {
+        id: 'neutral',
+        name: 'Neutral Forces',
+        color: '#808080'
+    };
+
     private terrainMovementCosts: Record<TerrainType, number> = {
         'PLAINS': 1,
         'MOUNTAINS': 2,
@@ -14,16 +22,13 @@ export class GameManager {
     constructor() {
         this.games = new Map();
         this.mapGenerator = new MapGenerator();
+        this.combatManager = new CombatManager();
     }
 
     public createGame(): string {
         const gameId = Math.random().toString(36).substring(7);
         const initialState = this.createInitialState();
         this.games.set(gameId, initialState);
-
-        // Place starting units
-        this.placeStartingUnits(gameId);
-
         return gameId;
     }
 
@@ -38,54 +43,94 @@ export class GameManager {
     }
 
     private createInitialState(): GameState {
-        return {
-            players: [],
+        const player1: Player = {
+            id: 'player1',
+            name: 'Player 1',
+            color: '#ff0000'
+        };
+
+        const state: GameState = {
+            players: [player1, this.NEUTRAL_PLAYER],  // Add neutral player
+            currentPlayerId: player1.id,
             map: this.mapGenerator.generateMap(10, 10),
             currentTurn: 0
         };
+
+        // Place units after state is created
+        this.placeStartingUnits(state);
+        this.placeNeutralUnits(state);
+
+        return state;
     }
 
-    private placeStartingUnits(gameId: string) {
-        const game = this.games.get(gameId);
-        if (!game) return;
+    private placeStartingUnits(state: GameState) {
+        const playerId = state.players[0].id;
 
         // Find center of the map
-        const centerRow = Math.floor(game.map.length / 2);
-        const centerColumn = Math.floor(game.map[0].length / 2);
+        const centerRow = Math.floor(state.map.length / 2);
+        const centerColumn = Math.floor(state.map[0].length / 2);
 
-        // Make sure the center and adjacent tile are plains (for better start)
-        game.map[centerRow][centerColumn].type = 'PLAINS';
-        game.map[centerRow][centerColumn + 1].type = 'PLAINS';
+        // Make sure the center and adjacent tile are plains
+        state.map[centerRow][centerColumn].type = 'PLAINS';
+        state.map[centerRow][centerColumn + 1].type = 'PLAINS';
 
         // Place settler in center
-        game.map[centerRow][centerColumn].unit = {
-            id: `SETTLER-${Date.now()}`,
-            type: 'SETTLER',
-            position: { row: centerRow, column: centerColumn },
-            owner: 'player1',
-            movementPoints: 2,
-            maxMovementPoints: 2
-        };
+        state.map[centerRow][centerColumn].unit = this.combatManager.createUnit(
+            'SETTLER',
+            playerId,
+            { row: centerRow, column: centerColumn }
+        );
 
         // Place warrior adjacent to settler
-        game.map[centerRow][centerColumn + 1].unit = {
-            id: `WARRIOR-${Date.now()}`,
-            type: 'WARRIOR',
-            position: { row: centerRow, column: centerColumn + 1 },
-            owner: 'player1',
-            movementPoints: 2,
-            maxMovementPoints: 2
-        };
-
-        console.log('Placed starting units:', game.map[centerRow][centerColumn].unit, game.map[centerRow][centerColumn + 1].unit);
+        state.map[centerRow][centerColumn + 1].unit = this.combatManager.createUnit(
+            'WARRIOR',
+            playerId,
+            { row: centerRow, column: centerColumn + 1 }
+        );
     }
 
-    public placeUnit(gameId: string, position: Position, unitType: string): boolean {
-        const game = this.games.get(gameId);
-        if (!game) {
-            console.log('Game not found:', gameId);
-            return false;
+    private placeNeutralUnits(state: GameState) {
+        const numNeutralUnits = 4;
+        const unitTypes = ['WARRIOR', 'ARCHER'];
+        const map = state.map;
+        const height = map.length;
+        const width = map[0].length;
+        const centerRow = Math.floor(height / 2);
+        const centerColumn = Math.floor(width / 2);
+
+        let unitsPlaced = 0;
+        let attempts = 0;
+        const maxAttempts = 100;
+
+        while (unitsPlaced < numNeutralUnits && attempts < maxAttempts) {
+            attempts++;
+
+            const row = Math.floor(Math.random() * height);
+            const column = Math.floor(Math.random() * width);
+
+            const distanceFromCenter = Math.abs(row - centerRow) + Math.abs(column - centerColumn);
+            if (distanceFromCenter < 3) continue;
+
+            const tile = map[row][column];
+
+            if (!tile.unit && tile.type !== 'WATER' && tile.type !== 'MOUNTAINS') {
+                const unitType = unitTypes[Math.floor(Math.random() * unitTypes.length)];
+
+                tile.unit = this.combatManager.createUnit(
+                    unitType,
+                    this.NEUTRAL_PLAYER.id,
+                    { row, column }
+                );
+
+                unitsPlaced++;
+                console.log(`Placed neutral ${unitType} at (${row}, ${column})`);
+            }
         }
+    }
+
+    public placeUnit(gameId: string, playerId: string, position: Position, unitType: string): boolean {
+        const game = this.games.get(gameId);
+        if (!game) return false;
 
         const tile = game.map[position.row][position.column];
 
@@ -99,22 +144,24 @@ export class GameManager {
             return false;
         }
 
-        tile.unit = {
-            id: `${unitType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            type: unitType,
-            position: {...position},
-            owner: 'player1',
-            movementPoints: 2,
-            maxMovementPoints: 2
-        };
+        tile.unit = this.combatManager.createUnit(
+            unitType,
+            playerId,
+            position
+        );
 
         console.log('Unit placed successfully:', tile.unit);
         return true;
     }
 
-    public moveUnit(gameId: string, unitId: string, newPosition: Position): boolean {
+    public moveUnit(gameId: string, playerId: string, unitId: string, newPosition: Position): boolean {
         const game = this.games.get(gameId);
         if (!game) return false;
+
+        if (game.currentPlayerId !== playerId) {
+            console.log('Not this player\'s turn');
+            return false;
+        }
 
         // Find unit
         let unit: Unit | undefined;
@@ -131,6 +178,12 @@ export class GameManager {
         }
 
         if (!unit || !oldTile) return false;
+
+        // Check if unit belongs to the player
+        if (!unit || unit.ownerId !== playerId) {
+            console.log('Unit does not belong to this player');
+            return false;
+        }
 
         // Calculate path and total cost
         const pathCost = this.calculatePathCost(game.map, unit.position, newPosition);
@@ -263,5 +316,44 @@ export class GameManager {
 
     public getMovementCost(tile: Tile): number {
         return this.terrainMovementCosts[tile.type] || Infinity;
+    }
+
+    public attackUnit(gameId: string, playerId: string, attackerPos: Position, defenderPos: Position): any {
+        const game = this.games.get(gameId);
+        if (!game) return false;
+
+        const attacker = game.map[attackerPos.row][attackerPos.column].unit;
+        const defender = game.map[defenderPos.row][defenderPos.column].unit;
+
+        if (!attacker || !defender) return false;
+        if (attacker.ownerId !== playerId) return false;
+        if (attacker.movementPoints <= 0) return false;
+
+        // Check range
+        const distance = this.calculateDistance(attackerPos, defenderPos);
+        if (distance > attacker.range) return false;
+
+        // Resolve combat
+        const result = this.combatManager.resolveCombat(attacker, defender);
+
+        // Remove dead units
+        if (result.attackerDied) {
+            game.map[attackerPos.row][attackerPos.column].unit = undefined;
+        }
+        if (result.defenderDied) {
+            game.map[defenderPos.row][defenderPos.column].unit = undefined;
+        }
+
+        // Consume movement points
+        attacker.movementPoints = 0;
+
+        // Return enhanced combat result
+        return {
+            ...result,
+            attackerType: attacker.type,
+            defenderType: defender.type,
+            attackerLevel: attacker.level,
+            defenderLevel: defender.level
+        };
     }
 }
