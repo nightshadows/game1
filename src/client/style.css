@@ -60,6 +60,7 @@ button:hover {
     margin: 0;
     border: none;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    /*    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);*/
 }
 
 .tile:hover {
@@ -67,19 +68,51 @@ button:hover {
 }
 
 .tile-plains {
-    background-color: #90EE90;
+    background: #90EE90;
+    background-image:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 10%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.1) 2px, transparent 2px, transparent 8px);
 }
 
 .tile-mountains {
-    background-color: #8B4513;
+    background: #8B4513;
+    background-image:
+        linear-gradient(45deg, rgba(139,69,19,0.5) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(139,69,19,0.5) 25%, transparent 25%),
+        linear-gradient(135deg, rgba(255,255,255,0.1) 15%, transparent 15%);
+    background-size: 20px 20px, 20px 20px, 40px 40px;
 }
 
 .tile-water {
-    background-color: #4169E1;
+    background: #4169E1;
+    background-image:
+        linear-gradient(to right, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.1) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 10px 10px;
+    animation: water-movement 2s linear infinite;
 }
 
 .tile-forest {
-    background-color: #228B22;
+    background: #228B22;
+    background-image:
+        linear-gradient(135deg,
+            transparent 0%,
+            rgba(25, 87, 25, 0.4) 45%,
+            rgba(25, 87, 25, 0.7) 65%,
+            rgba(20, 70, 20, 0.4) 85%,
+            transparent 100%
+        ),
+        linear-gradient(45deg, rgba(34,139,34,0.4) 25%, transparent 25%);
+    background-size: 100% 100%, 20px 20px;
+}
+
+@keyframes water-movement {
+    from {
+        background-position: 0 0;
+    }
+    to {
+        background-position: 10px 10px;
+    }
 }
 
 .unit {
