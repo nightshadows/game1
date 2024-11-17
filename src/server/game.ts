@@ -1,5 +1,5 @@
 import { MapGenerator } from './mapGenerator';
-import { GameState, TerrainType, Tile, Position, Unit, PathNode, Player, Game } from './types';
+import { GameState, TerrainType, Tile, Position, Unit, PathNode, Player, Game, TurnResult } from './types';
 import { CombatManager } from './combatManager';
 
 export class GameManager {
@@ -292,11 +292,44 @@ export class GameManager {
         return null; // No path found
     }
 
-    public endTurn(gameId: string): void {
+    public endTurn(gameId: string): TurnResult {
         const game = this.games.get(gameId);
-        if (!game) return;
+        if (!game) return { success: false, healedUnits: [] };
+
+        // Heal fortified units
+        let healedUnits: { unitType: string, healing: number }[] = [];
+
+        for (const row of game.map) {
+            for (const tile of row) {
+                const unit = tile.unit;
+                if (unit && unit.fortified && unit.ownerId === 'player1') {
+                    const healAmount = 10;
+                    const oldHealth = unit.currentHealth;
+                    unit.currentHealth = Math.min(unit.maxHealth, unit.currentHealth + healAmount);
+                    const actualHealing = unit.currentHealth - oldHealth;
+
+                    if (actualHealing > 0) {
+                        healedUnits.push({
+                            unitType: unit.type,
+                            healing: actualHealing
+                        });
+                    }
+                }
+            }
+        }
 
         // Reset movement points for all units
+        this.resetMovementPoints(game);
+
+        game.currentTurn++;
+
+        return {
+            success: true,
+            healedUnits
+        };
+    }
+
+    private resetMovementPoints(game: GameState) {
         for (const row of game.map) {
             for (const tile of row) {
                 if (tile.unit) {

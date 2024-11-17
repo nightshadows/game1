@@ -75,3 +75,11 @@ export interface Game {
     map: Tile[][];
     currentPlayerId: string;
 }
+
+export interface TurnResult {
+    success: boolean;
+    healedUnits: {
+        unitType: string;
+        healing: number;
+    }[];
+}

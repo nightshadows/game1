@@ -311,6 +311,17 @@ button:hover {
     font-weight: bold;
 }
 
+.log-heal {
+    color: #2ecc71;  /* Green color for healing */
+    font-weight: bold;
+}
+
+.log-miracle {
+    color: #e67e22;  /* Orange color for miraculous events */
+    font-weight: bold;
+    font-style: italic;
+}
+
 .unit-actions {
     margin-top: 10px;
     display: flex;
@@ -381,4 +392,11 @@ button:hover {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.empty-info {
+    color: #888;
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
 }

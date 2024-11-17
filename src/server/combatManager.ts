@@ -56,7 +56,7 @@ export class CombatManager {
             attacker.fortified = false;
         }
 
-        // Calculate damage with fortification bonus
+        // Calculate damage
         const attackerDamage = this.calculateDamage(attacker, defender);
         const defenderDamage = this.canCounterAttack(attacker, defender) ?
             this.calculateDamage(defender, attacker) : 0;
@@ -67,17 +67,29 @@ export class CombatManager {
             attacker.currentHealth -= defenderDamage;
         }
 
-        // Check for deaths
-        const attackerDied = attacker.currentHealth <= 0;
-        const defenderDied = defender.currentHealth <= 0;
+        // Check if both units would die
+        let attackerDied = attacker.currentHealth <= 0;
+        let defenderDied = defender.currentHealth <= 0;
 
-        // Calculate experience gained for both units
+        // If both units would die, randomly save one with 1 HP
+        if (attackerDied && defenderDied) {
+            const saveAttacker = Math.random() < 0.5;
+            if (saveAttacker) {
+                attacker.currentHealth = 1;
+                attackerDied = false;
+            } else {
+                defender.currentHealth = 1;
+                defenderDied = false;
+            }
+        }
+
+        // Calculate experience gained
         let attackerXP = 0;
         let defenderXP = 0;
 
         // Award XP for dealing damage
-        if (attacker.ownerId === 'player1') {
-            attackerXP = Math.ceil(attackerDamage * 0.5); // 0.5 XP per point of damage dealt
+        if (attacker.ownerId === 'player1' && !attackerDied) {
+            attackerXP = Math.ceil(attackerDamage * 0.5);
             if (defenderDied) {
                 attackerXP += 20; // Bonus XP for defeating an enemy
             }
@@ -86,7 +98,7 @@ export class CombatManager {
 
         // Award XP for defending and counter-attacking
         if (defender.ownerId === 'player1' && !defenderDied) {
-            defenderXP = Math.ceil(defenderDamage * 0.5); // 0.5 XP per point of damage dealt
+            defenderXP = Math.ceil(defenderDamage * 0.5);
             if (attackerDied) {
                 defenderXP += 20; // Bonus XP for defeating an enemy
             }
@@ -98,8 +110,8 @@ export class CombatManager {
             defenderDamage,
             attackerDied,
             defenderDied,
-            attackerXP,    // New field
-            defenderXP,    // New field
+            attackerXP,
+            defenderXP,
             attackerLevelUp: null,
             defenderLevelUp: null,
             initialAttackerLevel,

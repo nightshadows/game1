@@ -60,6 +60,28 @@ class Game {
                 const previousState = this.gameState;
                 this.gameState = data.state;
 
+                // Check if currently selected unit died in combat
+                if (data.combatResult && this.selectedUnitId) {
+                    const { attackerDied, defenderDied } = data.combatResult;
+                    const selectedUnit = this.findUnit(this.selectedUnitId);
+
+                    if (!selectedUnit) {  // If we can't find the selected unit, it died
+                        this.clearUnitSelection();
+                        this.showEmptyInfoPanel();
+                    }
+                }
+
+                // Show healing messages for fortified units
+                if (data.healedUnits && data.healedUnits.length > 0) {
+                    data.healedUnits.forEach((healInfo: { unitType: string, healing: number }) => {
+                        this.addCombatLog(`
+                            <span class="log-heal">
+                                💚 Fortified ${this.getUnitSymbol(healInfo.unitType)} ${healInfo.unitType} healed for ${healInfo.healing} HP
+                            </span>
+                        `);
+                    });
+                }
+
                 // If this update was from a fortify action, add the log message
                 if (data.fortified) {
                     const unit = this.findUnit(data.fortified.unitId);
@@ -91,7 +113,6 @@ class Game {
                         attackerPlayer, defenderPlayer
                     } = data.combatResult;
 
-                    // Combat message
                     let logMessage = `
                         <span class="log-damage">⚔️ ${attackerType} (${attackerPlayer}) attacks ${defenderType} (${defenderPlayer})!</span><br>
                         <span class="log-damage">➡️ Deals ${attackerDamage} damage</span>`;
@@ -106,10 +127,11 @@ class Game {
                         logMessage += `<br><span class="log-death">💀 ${deadUnit} (${deadPlayer}) was defeated!</span>`;
                     }
 
-                    if (attackerXP > 0) {
+                    // Only show XP gains for surviving units
+                    if (attackerXP > 0 && !attackerDied) {
                         logMessage += `<br><span class="log-experience">⭐ ${attackerType} gained ${attackerXP} XP</span>`;
                     }
-                    if (defenderXP > 0) {
+                    if (defenderXP > 0 && !defenderDied) {
                         logMessage += `<br><span class="log-experience">⭐ ${defenderType} gained ${defenderXP} XP</span>`;
                     }
 
@@ -166,6 +188,7 @@ class Game {
     }
 
     private clearUnitSelection() {
+        this.selectedUnit = null;
         this.selectedUnitId = null;
         this.possibleMoves = [];
     }
@@ -556,10 +579,10 @@ class Game {
     }
 
     private showEmptyInfoPanel() {
-        this.infoPanel.className = 'empty';
+        this.infoPanel.className = '';
         this.infoPanel.innerHTML = `
-            <div style="text-align: center;">
-                No unit selected
+            <div class="empty-info">
+                <p>Select a unit to view its information</p>
             </div>
         `;
     }

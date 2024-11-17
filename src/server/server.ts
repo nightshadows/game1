@@ -75,11 +75,14 @@ wss.on('connection', (ws) => {
 
             case 'END_TURN':
                 if (currentGameId) {
-                    gameManager.endTurn(currentGameId);
-                    ws.send(JSON.stringify({
-                        type: 'GAME_UPDATED',
-                        state: gameManager.getGameState(currentGameId)
-                    }));
+                    const turnResult = gameManager.endTurn(currentGameId);
+                    if (turnResult.success) {
+                        ws.send(JSON.stringify({
+                            type: 'GAME_UPDATED',
+                            state: gameManager.getGameState(currentGameId),
+                            healedUnits: turnResult.healedUnits
+                        }));
+                    }
                 }
                 break;
 
