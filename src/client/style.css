@@ -270,11 +270,13 @@ button:hover {
 }
 
 #combat-log {
+    display: flex;
+    flex-direction: column;
     background: #1a1a1a;
     color: #fff;
     padding: 10px;
     border-radius: 4px;
-    width: 300px;
+    width: 450px;
     height: 200px;
     overflow-y: auto;
     font-family: monospace;

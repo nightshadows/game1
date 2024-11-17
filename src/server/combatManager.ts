@@ -48,6 +48,10 @@ export class CombatManager {
     }
 
     public resolveCombat(attacker: Unit, defender: Unit): CombatResult {
+        // Store initial levels
+        const initialAttackerLevel = attacker.level;
+        const initialDefenderLevel = defender.level;
+
         // Calculate base damages
         let attackerDamage = this.calculateDamage(attacker.attackStrength, attacker.level);
         let defenderDamage = defender.range === 0 ? 0 : this.calculateDamage(defender.attackStrength, defender.level);
@@ -81,15 +85,19 @@ export class CombatManager {
 
         // Calculate and apply experience
         const experienceGained = this.calculateExperience(attackerDied || defenderDied);
-        if (!attackerDied) this.applyExperience(attacker, experienceGained);
-        if (!defenderDied) this.applyExperience(defender, experienceGained);
+        const attackerLevelUp = !attackerDied ? this.applyExperience(attacker, experienceGained) : null;
+        const defenderLevelUp = !defenderDied ? this.applyExperience(defender, experienceGained) : null;
 
         return {
             attackerDamage,
             defenderDamage,
             attackerDied,
             defenderDied,
-            experienceGained
+            experienceGained,
+            attackerLevelUp,
+            defenderLevelUp,
+            initialAttackerLevel,
+            initialDefenderLevel
         };
     }
 
@@ -104,14 +112,21 @@ export class CombatManager {
         return this.BASE_XP_GAIN * (unitDied ? 2 : 1);
     }
 
-    private applyExperience(unit: Unit, xp: number): void {
+    private applyExperience(unit: Unit, xp: number): { levelGained: boolean, newLevel?: number } {
         unit.experience += xp;
+        let levelGained = false;
+        let newLevel;
+
         while (unit.experience >= this.XP_PER_LEVEL) {
             unit.experience -= this.XP_PER_LEVEL;
             unit.level++;
+            newLevel = unit.level;
+            levelGained = true;
             unit.maxHealth += 10;
             unit.currentHealth = unit.maxHealth;
             unit.attackStrength += 5;
         }
+
+        return { levelGained, newLevel };
     }
 }

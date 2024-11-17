@@ -336,12 +336,20 @@ export class GameManager {
         // Resolve combat
         const result = this.combatManager.resolveCombat(attacker, defender);
 
-        // Remove dead units
-        if (result.attackerDied) {
+        // Handle unit death and movement
+        if (result.defenderDied && attacker.range === 1) { // Only melee units move to the target position
+            // Move attacker to defender's position
+            attacker.position = { ...defenderPos };
+            game.map[defenderPos.row][defenderPos.column].unit = attacker;
             game.map[attackerPos.row][attackerPos.column].unit = undefined;
-        }
-        if (result.defenderDied) {
-            game.map[defenderPos.row][defenderPos.column].unit = undefined;
+        } else {
+            // Handle normal unit removal
+            if (result.attackerDied) {
+                game.map[attackerPos.row][attackerPos.column].unit = undefined;
+            }
+            if (result.defenderDied) {
+                game.map[defenderPos.row][defenderPos.column].unit = undefined;
+            }
         }
 
         // Consume movement points
@@ -352,8 +360,10 @@ export class GameManager {
             ...result,
             attackerType: attacker.type,
             defenderType: defender.type,
-            attackerLevel: attacker.level,
-            defenderLevel: defender.level
+            attackerLevel: result.initialAttackerLevel,
+            defenderLevel: result.initialDefenderLevel,
+            attackerPlayer: attacker.ownerId === 'neutral' ? 'Neutral Forces' : 'Player 1',
+            defenderPlayer: defender.ownerId === 'neutral' ? 'Neutral Forces' : 'Player 1'
         };
     }
 }

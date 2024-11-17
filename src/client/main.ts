@@ -62,11 +62,14 @@ class Game {
                         attackerDied, defenderDied,
                         experienceGained,
                         attackerType, defenderType,
-                        attackerLevel, defenderLevel
+                        attackerLevel, defenderLevel,
+                        attackerPlayer, defenderPlayer,
+                        attackerLevelUp, defenderLevelUp
                     } = data.combatResult;
 
+                    // Combat message
                     let logMessage = `
-                        <span class="log-damage">⚔️ Level ${attackerLevel} ${attackerType} attacks Level ${defenderLevel} ${defenderType}!</span><br>
+                        <span class="log-damage">⚔️ ${attackerType} (${attackerPlayer}) attacks ${defenderType} (${defenderPlayer})!</span><br>
                         <span class="log-damage">➡️ Deals ${attackerDamage} damage</span>`;
 
                     if (defenderDamage > 0) {
@@ -75,8 +78,8 @@ class Game {
 
                     if (attackerDied || defenderDied) {
                         const deadUnit = attackerDied ? attackerType : defenderType;
-                        const deadLevel = attackerDied ? attackerLevel : defenderLevel;
-                        logMessage += `<br><span class="log-death">💀 Level ${deadLevel} ${deadUnit} was defeated!</span>`;
+                        const deadPlayer = attackerDied ? attackerPlayer : defenderPlayer;
+                        logMessage += `<br><span class="log-death">💀 ${deadUnit} (${deadPlayer}) was defeated!</span>`;
                     }
 
                     if (experienceGained > 0) {
@@ -84,6 +87,14 @@ class Game {
                     }
 
                     this.addCombatLog(logMessage);
+
+                    // Add level-up messages after combat message
+                    if (attackerLevelUp?.levelGained) {
+                        this.addCombatLog(`<span class="log-experience">🎖️ ${attackerType} (${attackerPlayer}) reached level ${attackerLevelUp.newLevel}!</span>`);
+                    }
+                    if (defenderLevelUp?.levelGained) {
+                        this.addCombatLog(`<span class="log-experience">🎖️ ${defenderType} (${defenderPlayer}) reached level ${defenderLevelUp.newLevel}!</span>`);
+                    }
                 }
 
                 // Update info panel based on selected unit first
@@ -579,12 +590,15 @@ class Game {
         const entry = document.createElement('div');
         entry.className = 'log-entry';
         entry.innerHTML = message;
-        logWindow.insertBefore(entry, logWindow.firstChild);
+        logWindow.appendChild(entry);
 
         // Keep only the last 50 messages
         while (logWindow.children.length > 50) {
-            logWindow.removeChild(logWindow.lastChild!);
+            logWindow.removeChild(logWindow.firstChild!);
         }
+
+        // Scroll to the bottom to show new message
+        logWindow.scrollTop = logWindow.scrollHeight;
     }
 
     private clearCombatLog() {

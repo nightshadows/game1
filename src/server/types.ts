@@ -63,4 +63,8 @@ export interface CombatResult {
     attackerDied: boolean;
     defenderDied: boolean;
     experienceGained: number;
+    attackerLevelUp: { levelGained: boolean; newLevel?: number } | null;
+    defenderLevelUp: { levelGained: boolean; newLevel?: number } | null;
+    initialAttackerLevel: number;
+    initialDefenderLevel: number;
 }
